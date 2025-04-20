@@ -1,31 +1,38 @@
-# 📊 RSI + SMA Trading Strategy using vectorbt
+import vectorbt as vbt
+import pandas as pd
 
-This project demonstrates a simple trading strategy that combines the **Relative Strength Index (RSI)** and **Simple Moving Averages (SMA)**, using the powerful [vectorbt](https://github.com/polakowo/vectorbt) library for backtesting and visualization.
+# Parameters
+symbol = 'AAPL'
+rsi_window = 14
+sma_fast_window = 10
+sma_slow_window = 30
 
-## 💡 Strategy Logic
-- **Buy Signal**:  
-  - Short-term SMA crosses **above** long-term SMA (**bullish crossover**)  
-  - RSI is **below 30** (indicating oversold conditions)
+# 1. Get closing prices
+price = vbt.YFData.download(symbol).get('Close')
 
-- **Sell Signal**:  
-  - Short-term SMA crosses **below** long-term SMA  
-  - RSI is **above 70** (indicating overbought conditions)
+# 2. Calculate RSI manually
+delta = price.diff()
+gain = delta.where(delta > 0, 0)
+loss = -delta.where(delta < 0, 0)
 
-## 🛠️ Features
-- Pulls historical stock data via Yahoo Finance
-- Manually calculates RSI using pandas
-- Computes fast and slow SMAs with rolling averages
-- Generates entry/exit signals based on RSI + SMA logic
-- Backtests the strategy using `vectorbt.Portfolio`
-- Visualizes trade entries, exits, and performance
+avg_gain = gain.rolling(window=rsi_window).mean()
+avg_loss = loss.rolling(window=rsi_window).mean()
+rs = avg_gain / avg_loss
+rsi = 100 - (100 / (1 + rs))
 
-## 📁 Files
-- `vectorbt.ipynb` – Jupyter notebook containing the full code, logic, and visual output
+# 3. Moving Averages
+sma_fast = price.rolling(window=sma_fast_window).mean()
+sma_slow = price.rolling(window=sma_slow_window).mean()
 
-## 📦 Requirements
-- `vectorbt`
-- `pandas`
-- `yfinance`  
-Install them using:
-```bash
-pip install vectorbt pandas yfinance
+# 4. Entry/Exit Logic
+entries = (sma_fast > sma_slow) & (rsi < 30)
+exits = (sma_fast < sma_slow) | (rsi > 70)
+
+# 5. Portfolio Backtest
+portfolio = vbt.Portfolio.from_signals(price, entries, exits)
+
+# 6. Results
+print(portfolio.stats())
+portfolio.plot().show()
+
+
